@@ -1,5 +1,5 @@
+use godot::classes::{ISprite2D, InputEvent, InputEventMouse, Sprite2D};
 use godot::prelude::*;
-use godot::classes::{Sprite2D, ISprite2D};
 
 #[derive(GodotClass)]
 #[class(base=Sprite2D)]
@@ -14,11 +14,24 @@ impl ISprite2D for Board {
         godot_print!("Make a board...");
         Self {
             input: Input::singleton(),
-            base
+            base,
         }
     }
 
-    fn physics_process(&mut self, delta: f64) {
+    fn physics_process(&mut self, _: f64) {}
 
+    fn input(&mut self, event: Gd<InputEvent>) {
+        if self.input.is_action_pressed("put_stone") {
+            match event.try_cast::<InputEventMouse>() {
+                Ok(mouse_event) => {
+                    godot_print!(
+                        "Left button was clicked at {},{}",
+                        mouse_event.get_position().x - 484.0,
+                        mouse_event.get_position().y - 64.0
+                    );
+                }
+                Err(_) => return,
+            }
+        }
     }
 }
