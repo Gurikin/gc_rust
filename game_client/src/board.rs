@@ -22,15 +22,12 @@ impl ISprite2D for Board {
 
     fn input(&mut self, event: Gd<InputEvent>) {
         if self.input.is_action_pressed("put_stone") {
-            match event.try_cast::<InputEventMouse>() {
-                Ok(mouse_event) => {
-                    godot_print!(
-                        "Left button was clicked at {},{}",
-                        mouse_event.get_position().x - 484.0,
-                        mouse_event.get_position().y - 64.0
-                    );
-                }
-                Err(_) => return,
+            if let Ok(mouse_event) = event.try_cast::<InputEventMouse>() {
+                godot_print!(
+                    "Left button was clicked at {},{}",
+                    mouse_event.get_position().x - 484.0,
+                    mouse_event.get_position().y - 64.0
+                );
             }
         }
     }
