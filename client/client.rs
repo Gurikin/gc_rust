@@ -28,8 +28,6 @@ extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
-use std::str::Bytes;
-
 use mio::{net::UdpSocket, Poll};
 use quiche::Connection;
 use ring::rand::*;
@@ -75,11 +73,25 @@ impl QuicConnection {
         let mut config = quiche::Config::new(quiche::PROTOCOL_VERSION).unwrap();
 
         // *CAUTION*: this should not be set to `false` in production!!!
-        config.verify_peer(true);
+        config.verify_peer(false);
 
         config
             .set_application_protos(&[b"hq-interop", b"hq-29", b"hq-28", b"hq-27", b"http/0.9", b"http/1.1"])
             .unwrap();
+
+        match config.load_verify_locations_from_directory("./") {
+            Ok(_) => (),
+            Err(e) => error!("Load verify location error. {}", e),
+        };
+        match config.load_cert_chain_from_pem_file("cert.crt") {
+            Ok(_) => (),
+            Err(e) => error!("Load cert error. {}", e),
+        }
+
+        match config.load_priv_key_from_pem_file("cert.key") {
+            Ok(_) => (),
+            Err(e) => error!("Load private key error. {}", e),
+        }
 
         config.set_max_idle_timeout(5000);
         config.set_max_recv_udp_payload_size(MAX_DATAGRAM_SIZE);
