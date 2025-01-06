@@ -60,6 +60,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "779ae4bf7e8421cf91c0b3b64e7e8b40b862fba4d393f59150042de7c4965a94"
 
 [[package]]
+name = "go_udp_request"
+version = "0.1.0"
+dependencies = [
+ "uuid",
+]
+
+[[package]]
 name = "godot"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

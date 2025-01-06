@@ -1,10 +1,8 @@
-[package]
-name = "gc_rust"
-version = "0.1.0"
-edition = "2021"
+[workspace]
 
-[lib]
-crate-type = ["cdylib"]
+resolver = "2"
 
-[dependencies]
-godot = "0.2.1"
+members = [
+    "go_udp_request",
+    "game_client",
+]
