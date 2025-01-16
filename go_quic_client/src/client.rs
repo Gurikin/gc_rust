@@ -89,10 +89,67 @@ impl Default for ConnectionConfig {
 }
 
 pub struct GoGameClient {
-    pub conn: Connection,
     pub socket: UdpSocket,
+    pub conn: Connection,
     pub poll: Poll,
     pub events: Events,
+}
+
+impl GoGameClient {
+    pub fn new(conn_config: &mut ConnectionConfig) -> Self {
+        // Bind to INADDR_ANY or IN6ADDR_ANY depending on the IP family of the
+        // server address. This is needed on macOS and BSD variants that don't
+        // support binding to IN6ADDR_ANY for both v4 and v6.
+        let bind_addr = match conn_config.peer_addr {
+            SocketAddr::V4(_) => "0.0.0.0:0",
+            SocketAddr::V6(_) => "[::]:0",
+        };
+
+        // Create the UDP socket backing the QUIC connection, and register it with
+        // the event loop.
+        let mut socket = mio::net::UdpSocket::bind(bind_addr.parse().unwrap()).unwrap();
+
+        // Setup the event loop.
+        let mut poll = mio::Poll::new().unwrap();
+        let mut events = mio::Events::with_capacity(1024);
+
+        poll.registry()
+            .register(&mut socket, mio::Token(0), mio::Interest::READABLE)
+            .unwrap();
+
+        // Generate a random source connection ID for the connection.
+        let mut scid = [0; quiche::MAX_CONN_ID_LEN];
+        SystemRandom::new().fill(&mut scid[..]).unwrap();
+
+        let scid = quiche::ConnectionId::from_ref(&scid);
+
+        // Get local address.
+        let local_addr = socket.local_addr().unwrap();
+
+        // Create a QUIC connection and initiate handshake.
+        let conn = quiche::connect(
+            conn_config.url.domain(),
+            &scid,
+            local_addr,
+            conn_config.peer_addr,
+            &mut conn_config.config,
+        )
+        .unwrap();
+
+        info!(
+            "connecting to {:} from {:} with scid {}",
+            conn_config.peer_addr,
+            socket.local_addr().unwrap(),
+            hex_dump(&scid)
+        );
+
+        Self {
+            socket,
+            conn,
+            poll,
+            events,
+        }
+    }
 }
 
 fn main() {
@@ -105,57 +162,11 @@ fn main() {
 
     let mut conn_config = ConnectionConfig::default();
 
-    // Setup the event loop.
-    let mut poll = mio::Poll::new().unwrap();
-    let mut events = mio::Events::with_capacity(1024);
+    let mut go_game_client = GoGameClient::new(&mut conn_config);
 
-    // Resolve server address.
-    // let peer_addr = url.socket_addrs(|| None).unwrap()[0];
+    let (write, send_info) = go_game_client.conn.send(&mut out).expect("initial send failed");
 
-    // Bind to INADDR_ANY or IN6ADDR_ANY depending on the IP family of the
-    // server address. This is needed on macOS and BSD variants that don't
-    // support binding to IN6ADDR_ANY for both v4 and v6.
-    let bind_addr = match conn_config.peer_addr {
-        SocketAddr::V4(_) => "0.0.0.0:0",
-        SocketAddr::V6(_) => "[::]:0",
-    };
-
-    // Create the UDP socket backing the QUIC connection, and register it with
-    // the event loop.
-    let mut socket = mio::net::UdpSocket::bind(bind_addr.parse().unwrap()).unwrap();
-    poll.registry()
-        .register(&mut socket, mio::Token(0), mio::Interest::READABLE)
-        .unwrap();
-
-    // Generate a random source connection ID for the connection.
-    let mut scid = [0; quiche::MAX_CONN_ID_LEN];
-    SystemRandom::new().fill(&mut scid[..]).unwrap();
-
-    let scid = quiche::ConnectionId::from_ref(&scid);
-
-    // Get local address.
-    let local_addr = socket.local_addr().unwrap();
-
-    // Create a QUIC connection and initiate handshake.
-    let mut conn = quiche::connect(
-        conn_config.url.domain(),
-        &scid,
-        local_addr,
-        conn_config.peer_addr,
-        &mut conn_config.config,
-    )
-    .unwrap();
-
-    info!(
-        "connecting to {:} from {:} with scid {}",
-        conn_config.peer_addr,
-        socket.local_addr().unwrap(),
-        hex_dump(&scid)
-    );
-
-    let (write, send_info) = conn.send(&mut out).expect("initial send failed");
-
-    while let Err(e) = socket.send_to(&out[..write], send_info.to) {
+    while let Err(e) = go_game_client.socket.send_to(&out[..write], send_info.to) {
         if e.kind() == std::io::ErrorKind::WouldBlock {
             debug!("send() would block");
             continue;
@@ -171,7 +182,7 @@ fn main() {
     let mut req_sent = false;
 
     loop {
-        poll.poll(&mut events, conn.timeout()).unwrap();
+        go_game_client.poll.poll(&mut go_game_client.events, go_game_client.conn.timeout()).unwrap();
 
         // Read incoming UDP packets from the socket and feed them to quiche,
         // until there are no more packets to read.
@@ -179,14 +190,14 @@ fn main() {
             // If the event loop reported no events, it means that the timeout
             // has expired, so handle it without attempting to read packets. We
             // will then proceed with the send loop.
-            if events.is_empty() {
+            if go_game_client.events.is_empty() {
                 debug!("timed out");
 
-                conn.on_timeout();
+                go_game_client.conn.on_timeout();
                 break 'read;
             }
 
-            let (len, from) = match socket.recv_from(&mut buf) {
+            let (len, from) = match go_game_client.socket.recv_from(&mut buf) {
                 Ok(v) => v,
 
                 Err(e) => {
@@ -204,12 +215,12 @@ fn main() {
             debug!("got {} bytes", len);
 
             let recv_info = quiche::RecvInfo {
-                to: socket.local_addr().unwrap(),
+                to: go_game_client.socket.local_addr().unwrap(),
                 from,
             };
 
             // Process potentially coalesced packets.
-            let read = match conn.recv(&mut buf[..len], recv_info) {
+            let read = match go_game_client.conn.recv(&mut buf[..len], recv_info) {
                 Ok(v) => v,
 
                 Err(e) => {
@@ -223,25 +234,25 @@ fn main() {
 
         debug!("done reading");
 
-        if conn.is_closed() {
-            info!("connection closed, {:?}", conn.stats());
+        if go_game_client.conn.is_closed() {
+            info!("connection closed, {:?}", go_game_client.conn.stats());
             break;
         }
 
         // Send an HTTP request as soon as the connection is established.
-        if conn.is_established() && !req_sent {
+        if go_game_client.conn.is_established() && !req_sent {
             info!("sending HTTP request for {}", conn_config.url.path());
 
             let req = "\r\n\0\0\0{{\"id\":10,\"name\":\"Гарри\"}}\r\n\0\0\0".to_string();
-            conn.stream_send(HTTP_REQ_STREAM_ID, req.as_bytes(), true)
+            go_game_client.conn.stream_send(HTTP_REQ_STREAM_ID, req.as_bytes(), true)
                 .unwrap();
 
             req_sent = true;
         }
 
         // Process all readable streams.
-        for s in conn.readable() {
-            while let Ok((read, fin)) = conn.stream_recv(s, &mut buf) {
+        for s in go_game_client.conn.readable() {
+            while let Ok((read, fin)) = go_game_client.conn.stream_recv(s, &mut buf) {
                 debug!("received {} bytes", read);
 
                 let stream_buf = &buf[..read];
@@ -255,7 +266,7 @@ fn main() {
                 if s == HTTP_REQ_STREAM_ID && fin {
                     info!("response received in {:?}, closing...", req_start.elapsed());
 
-                    conn.close(true, 0x00, b"kthxbye").unwrap();
+                    go_game_client.conn.close(true, 0x00, b"kthxbye").unwrap();
                 }
             }
         }
@@ -263,7 +274,7 @@ fn main() {
         // Generate outgoing QUIC packets and send them on the UDP socket, until
         // quiche reports that there are no more packets to be sent.
         loop {
-            let (write, send_info) = match conn.send(&mut out) {
+            let (write, send_info) = match go_game_client.conn.send(&mut out) {
                 Ok(v) => v,
 
                 Err(quiche::Error::Done) => {
@@ -274,12 +285,12 @@ fn main() {
                 Err(e) => {
                     error!("send failed: {:?}", e);
 
-                    conn.close(false, 0x1, b"fail").ok();
+                    go_game_client.conn.close(false, 0x1, b"fail").ok();
                     break;
                 }
             };
 
-            if let Err(e) = socket.send_to(&out[..write], send_info.to) {
+            if let Err(e) = go_game_client.socket.send_to(&out[..write], send_info.to) {
                 if e.kind() == std::io::ErrorKind::WouldBlock {
                     debug!("send() would block");
                     break;
@@ -291,8 +302,8 @@ fn main() {
             debug!("written {}", write);
         }
 
-        if conn.is_closed() {
-            info!("connection closed, {:?}", conn.stats());
+        if go_game_client.conn.is_closed() {
+            info!("connection closed, {:?}", go_game_client.conn.stats());
             break;
         }
     }
