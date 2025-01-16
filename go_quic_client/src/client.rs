@@ -24,12 +24,76 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use std::net::SocketAddr;
+
 use log::{debug, error, info};
+use mio::{net::UdpSocket, Events, Poll};
+use quiche::{Config, Connection};
 use ring::rand::*;
+use url::Url;
 
 const MAX_DATAGRAM_SIZE: usize = 1350;
 
 const HTTP_REQ_STREAM_ID: u64 = 4;
+
+pub struct ConnectionConfig {
+    pub url: Url,
+    pub peer_addr: SocketAddr,
+    pub config: Config,
+}
+
+impl ConnectionConfig {
+    pub fn new() -> Self {
+        let url = url::Url::parse("http://127.0.0.1:4433").unwrap();
+        let peer_addr = url.socket_addrs(|| None).unwrap()[0];
+        let mut config = quiche::Config::new(quiche::PROTOCOL_VERSION).unwrap();
+
+        config
+            .set_application_protos(&[b"hq-interop", b"hq-29", b"hq-28", b"hq-27", b"http/0.9"])
+            .unwrap();
+
+        // // *CAUTION*: this should not be set to `false` in production!!!
+        // config.verify_peer(false);
+        // match config.load_cert_chain_from_pem_file("cert.crt") {
+        //     Ok(_) => (),
+        //     Err(e) => error!("Load cert error. {}", e),
+        // }
+
+        // match config.load_priv_key_from_pem_file("cert.key") {
+        //     Ok(_) => (),
+        //     Err(e) => error!("Load private key error. {}", e),
+        // }
+
+        config.set_max_idle_timeout(5000);
+        config.set_max_recv_udp_payload_size(MAX_DATAGRAM_SIZE);
+        config.set_max_send_udp_payload_size(MAX_DATAGRAM_SIZE);
+        config.set_initial_max_data(10_000_000);
+        config.set_initial_max_stream_data_bidi_local(1_000_000);
+        config.set_initial_max_stream_data_bidi_remote(1_000_000);
+        config.set_initial_max_streams_bidi(100);
+        config.set_initial_max_streams_uni(100);
+        config.set_disable_active_migration(true);
+
+        Self {
+            url,
+            peer_addr,
+            config,
+        }
+    }
+}
+
+impl Default for ConnectionConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub struct GoGameClient {
+    pub conn: Connection,
+    pub socket: UdpSocket,
+    pub poll: Poll,
+    pub events: Events,
+}
 
 fn main() {
     pretty_env_logger::formatted_timed_builder()
@@ -39,31 +103,21 @@ fn main() {
     let mut buf = [0; 65535];
     let mut out = [0; MAX_DATAGRAM_SIZE];
 
-    let mut args = std::env::args();
-
-    let cmd = &args.next().unwrap();
-
-    if args.len() != 1 {
-        println!("Usage: {cmd} URL");
-        println!("\nSee tools/apps/ for more complete implementations.");
-        return;
-    }
-
-    let url = url::Url::parse(&args.next().unwrap()).unwrap();
+    let mut conn_config = ConnectionConfig::default();
 
     // Setup the event loop.
     let mut poll = mio::Poll::new().unwrap();
     let mut events = mio::Events::with_capacity(1024);
 
     // Resolve server address.
-    let peer_addr = url.socket_addrs(|| None).unwrap()[0];
+    // let peer_addr = url.socket_addrs(|| None).unwrap()[0];
 
     // Bind to INADDR_ANY or IN6ADDR_ANY depending on the IP family of the
     // server address. This is needed on macOS and BSD variants that don't
     // support binding to IN6ADDR_ANY for both v4 and v6.
-    let bind_addr = match peer_addr {
-        std::net::SocketAddr::V4(_) => "0.0.0.0:0",
-        std::net::SocketAddr::V6(_) => "[::]:0",
+    let bind_addr = match conn_config.peer_addr {
+        SocketAddr::V4(_) => "0.0.0.0:0",
+        SocketAddr::V6(_) => "[::]:0",
     };
 
     // Create the UDP socket backing the QUIC connection, and register it with
@@ -72,36 +126,6 @@ fn main() {
     poll.registry()
         .register(&mut socket, mio::Token(0), mio::Interest::READABLE)
         .unwrap();
-
-    // Create the configuration for the QUIC connection.
-    let mut config = quiche::Config::new(quiche::PROTOCOL_VERSION).unwrap();
-
-    // *CAUTION*: this should not be set to `false` in production!!!
-    config.verify_peer(false);
-
-    config
-        .set_application_protos(&[b"hq-interop", b"hq-29", b"hq-28", b"hq-27", b"http/0.9"])
-        .unwrap();
-
-    // match config.load_cert_chain_from_pem_file("cert.crt") {
-    //     Ok(_) => (),
-    //     Err(e) => error!("Load cert error. {}", e),
-    // }
-
-    // match config.load_priv_key_from_pem_file("cert.key") {
-    //     Ok(_) => (),
-    //     Err(e) => error!("Load private key error. {}", e),
-    // }
-
-    config.set_max_idle_timeout(5000);
-    config.set_max_recv_udp_payload_size(MAX_DATAGRAM_SIZE);
-    config.set_max_send_udp_payload_size(MAX_DATAGRAM_SIZE);
-    config.set_initial_max_data(10_000_000);
-    config.set_initial_max_stream_data_bidi_local(1_000_000);
-    config.set_initial_max_stream_data_bidi_remote(1_000_000);
-    config.set_initial_max_streams_bidi(100);
-    config.set_initial_max_streams_uni(100);
-    config.set_disable_active_migration(true);
 
     // Generate a random source connection ID for the connection.
     let mut scid = [0; quiche::MAX_CONN_ID_LEN];
@@ -113,12 +137,18 @@ fn main() {
     let local_addr = socket.local_addr().unwrap();
 
     // Create a QUIC connection and initiate handshake.
-    let mut conn =
-        quiche::connect(url.domain(), &scid, local_addr, peer_addr, &mut config).unwrap();
+    let mut conn = quiche::connect(
+        conn_config.url.domain(),
+        &scid,
+        local_addr,
+        conn_config.peer_addr,
+        &mut conn_config.config,
+    )
+    .unwrap();
 
     info!(
         "connecting to {:} from {:} with scid {}",
-        peer_addr,
+        conn_config.peer_addr,
         socket.local_addr().unwrap(),
         hex_dump(&scid)
     );
@@ -200,9 +230,9 @@ fn main() {
 
         // Send an HTTP request as soon as the connection is established.
         if conn.is_established() && !req_sent {
-            info!("sending HTTP request for {}", url.path());
+            info!("sending HTTP request for {}", conn_config.url.path());
 
-            let req = format!("\r\n\0\0\0{{\"id\":10,\"name\":\"Гарри\"}}\r\n\0\0\0");
+            let req = "\r\n\0\0\0{{\"id\":10,\"name\":\"Гарри\"}}\r\n\0\0\0".to_string();
             conn.stream_send(HTTP_REQ_STREAM_ID, req.as_bytes(), true)
                 .unwrap();
 
