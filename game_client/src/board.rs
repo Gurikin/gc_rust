@@ -1,3 +1,4 @@
+use go_quic_client::client::{send_request, ConnectionConfig, GoGameClient};
 use godot::classes::{ISprite2D, InputEvent, InputEventMouse, Sprite2D};
 use godot::prelude::*;
 
@@ -6,15 +7,21 @@ use godot::prelude::*;
 pub struct Board {
     input: Gd<Input>,
     base: Base<Sprite2D>,
+    conn_config: ConnectionConfig,
+    go_game_client: GoGameClient,
 }
 
 #[godot_api]
 impl ISprite2D for Board {
     fn init(base: Base<Self::Base>) -> Self {
         godot_print!("Make a board...");
+        let mut conn_config = ConnectionConfig::default();
+        let go_game_client = GoGameClient::new(&mut conn_config);
         Self {
             input: Input::singleton(),
             base,
+            conn_config,
+            go_game_client,
         }
     }
 
@@ -23,6 +30,11 @@ impl ISprite2D for Board {
     fn input(&mut self, event: Gd<InputEvent>) {
         if self.input.is_action_pressed("put_stone") {
             if let Ok(mouse_event) = event.try_cast::<InputEventMouse>() {
+                godot_print!(
+                    "{}",
+                    send_request(&mut self.conn_config, &mut self.go_game_client)
+                        .unwrap_or("default".to_string())
+                );
                 godot_print!(
                     "Left button was clicked at {},{}",
                     mouse_event.get_position().x - 484.0,

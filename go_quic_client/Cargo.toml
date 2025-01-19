@@ -7,10 +7,10 @@ edition = "2021"
 quiche = "0.22.0"
 ring = "0.17.8"
 log = { version = "0.4", features = ["std"] }
-pretty_env_logger = "0.5"
+log4rs = "1"
 mio = { version = "1.0", features = ["net", "os-poll"] }
 url = "2.5"
 
-[[bin]]
-name = "go_quic_client"
-path = "./src/client.rs"
+# [[bin]]
+# name = "go_quic_client"
+# path = "src/client.rs"

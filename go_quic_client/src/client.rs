@@ -110,8 +110,8 @@ impl GoGameClient {
         let mut socket = mio::net::UdpSocket::bind(bind_addr.parse().unwrap()).unwrap();
 
         // Setup the event loop.
-        let mut poll = mio::Poll::new().unwrap();
-        let mut events = mio::Events::with_capacity(1024);
+        let poll = mio::Poll::new().unwrap();
+        let events = mio::Events::with_capacity(1024);
 
         poll.registry()
             .register(&mut socket, mio::Token(0), mio::Interest::READABLE)
@@ -152,17 +152,18 @@ impl GoGameClient {
     }
 }
 
-fn main() {
-    pretty_env_logger::formatted_timed_builder()
-        .filter_level(log::LevelFilter::Debug)
-        .init();
+pub fn send_request(conn_config: &mut ConnectionConfig, go_game_client: &mut GoGameClient) -> Result<String, ()> {
+    log4rs::init_file("./config/log4rs.yaml", Default::default()).unwrap();
+    // pretty_env_logger::formatted_timed_builder()
+    //     .filter_level(log::LevelFilter::Debug)
+    //     .init();
 
     let mut buf = [0; 65535];
     let mut out = [0; MAX_DATAGRAM_SIZE];
 
-    let mut conn_config = ConnectionConfig::default();
+    // let mut conn_config = ConnectionConfig::default();
 
-    let mut go_game_client = GoGameClient::new(&mut conn_config);
+    // let mut go_game_client = GoGameClient::new(&mut conn_config);
 
     let (write, send_info) = go_game_client.conn.send(&mut out).expect("initial send failed");
 
@@ -236,7 +237,8 @@ fn main() {
 
         if go_game_client.conn.is_closed() {
             info!("connection closed, {:?}", go_game_client.conn.stats());
-            break;
+            return Ok(String::from_utf8_lossy(&buf).to_string());
+            // break;
         }
 
         // Send an HTTP request as soon as the connection is established.
@@ -304,7 +306,8 @@ fn main() {
 
         if go_game_client.conn.is_closed() {
             info!("connection closed, {:?}", go_game_client.conn.stats());
-            break;
+            return Ok(format!("{:?}", go_game_client.conn.stats()));
+            // break;
         }
     }
 }
@@ -314,3 +317,9 @@ fn hex_dump(buf: &[u8]) -> String {
 
     vec.join("")
 }
+
+// fn main() {
+//     let mut conn_config = ConnectionConfig::default();
+//     let mut client = GoGameClient::new(&mut conn_config);
+//     let _ = send_request(&mut conn_config, &mut client);
+// }
