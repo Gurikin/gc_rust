@@ -1,7 +1,7 @@
 use godot::prelude::*;
 
-pub mod board;
 pub mod auth_hud;
+pub mod board;
 
 struct GoClient;
 

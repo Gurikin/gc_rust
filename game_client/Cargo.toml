@@ -9,5 +9,6 @@ crate-type = ["cdylib"]
 [dependencies]
 godot = "0.2.1"
 serde_json = "1"
-go_quic_client = {path = "../go_quic_client"}
-go_udp_request = {path = "../go_udp_request"}
+reqwest = { version = "0.12.12", features = ["blocking", "json"] }
+go_quic_client = { path = "../go_quic_client" }
+go_udp_request = { path = "../go_udp_request" }

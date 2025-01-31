@@ -152,7 +152,10 @@ impl GoGameClient {
     }
 }
 
-pub fn send_request(conn_config: &mut ConnectionConfig, go_game_client: &mut GoGameClient) -> Result<String, ()> {
+pub fn send_request(
+    conn_config: &mut ConnectionConfig,
+    go_game_client: &mut GoGameClient,
+) -> Result<String, ()> {
     log4rs::init_file("./config/log4rs.yaml", Default::default()).unwrap();
     // pretty_env_logger::formatted_timed_builder()
     //     .filter_level(log::LevelFilter::Debug)
@@ -165,7 +168,10 @@ pub fn send_request(conn_config: &mut ConnectionConfig, go_game_client: &mut GoG
 
     // let mut go_game_client = GoGameClient::new(&mut conn_config);
 
-    let (write, send_info) = go_game_client.conn.send(&mut out).expect("initial send failed");
+    let (write, send_info) = go_game_client
+        .conn
+        .send(&mut out)
+        .expect("initial send failed");
 
     while let Err(e) = go_game_client.socket.send_to(&out[..write], send_info.to) {
         if e.kind() == std::io::ErrorKind::WouldBlock {
@@ -183,7 +189,10 @@ pub fn send_request(conn_config: &mut ConnectionConfig, go_game_client: &mut GoG
     let mut req_sent = false;
 
     loop {
-        go_game_client.poll.poll(&mut go_game_client.events, go_game_client.conn.timeout()).unwrap();
+        go_game_client
+            .poll
+            .poll(&mut go_game_client.events, go_game_client.conn.timeout())
+            .unwrap();
 
         // Read incoming UDP packets from the socket and feed them to quiche,
         // until there are no more packets to read.
@@ -246,7 +255,9 @@ pub fn send_request(conn_config: &mut ConnectionConfig, go_game_client: &mut GoG
             info!("sending HTTP request for {}", conn_config.url.path());
 
             let req = "\r\n\0\0\0{{\"id\":10,\"name\":\"Гарри\"}}\r\n\0\0\0".to_string();
-            go_game_client.conn.stream_send(HTTP_REQ_STREAM_ID, req.as_bytes(), true)
+            go_game_client
+                .conn
+                .stream_send(HTTP_REQ_STREAM_ID, req.as_bytes(), true)
                 .unwrap();
 
             req_sent = true;

@@ -34,7 +34,7 @@ pub struct RequestBuilder {
 /// ```
 /// use go_udp_request::request::game_request::GameRequest;
 /// use go_udp_request::step::game_step::PlayerStep;
-/// 
+///
 /// fn build(x: f32, y: f32, color: bool) -> GameRequest {
 ///     let player_step = PlayerStep {
 ///         x: x.into(),
