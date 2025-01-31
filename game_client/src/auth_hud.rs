@@ -5,7 +5,9 @@ use godot::{
     global::Error,
     prelude::*,
 };
-use reqwest::blocking::{Client, Response};
+use reqwest::{blocking::{Client, Response}, StatusCode};
+
+const HOST: &'static str = "http://localhost:8080";
 
 #[derive(GodotClass)]
 #[class(base=Control)]
@@ -29,6 +31,29 @@ impl AuthHud {
     }
 
     #[func]
+    fn on_signup(&mut self) {
+        godot_print_rich!("Signup pressed");
+        let auth_layer = self.base_mut().get_node_as::<CanvasLayer>("AuthLayer");
+        let mut sign_error_label = auth_layer.get_node_as::<Label>("SignError");
+
+        let login = self.get_login();
+        let pass = self.get_pass();
+        if login.is_err() || pass.is_err() {
+            return;
+        }
+        match self.send_auth_request(login.unwrap(), pass.unwrap(), "signup") {
+            Ok(mut response) => match response.status() {
+                StatusCode::OK => self.handle_ok_response(&mut response, &mut sign_error_label),
+                default => sign_error_label.set_text(format!("Failed to signup. Try another credentials. Status: {}", default).trim())
+            },
+            Err(e) => {
+                sign_error_label.set_text("Failed to signup. Try another credentials.");
+                godot_error!("Error on signup: {}", e)
+            }
+        };
+    }
+
+    #[func]
     fn on_signin(&mut self) {
         godot_print_rich!("Signin pressed");
         let auth_layer = self.base_mut().get_node_as::<CanvasLayer>("AuthLayer");
@@ -39,21 +64,29 @@ impl AuthHud {
         if login.is_err() || pass.is_err() {
             return;
         }
-        match self.send_request(login.unwrap(), pass.unwrap()) {
-            Ok(mut response) => {
-                let mut body: String = String::new();
-                let _ = response.read_to_string(&mut body);
-                godot_print_rich!("Body: {}", body);
-                godot_print_rich!("Signin response: {:?}", &response);
-                godot_print_rich!("Signin status: {}. Response: {}", &response.status(), &response.json::<String>().unwrap_or("No body".to_string()));
-                sign_error_label.set_text("");
-                // self.goto_players_list();
+        match self.send_auth_request(login.unwrap(), pass.unwrap(), "signin") {
+            Ok(mut response) => match response.status() {
+                StatusCode::OK => self.handle_ok_response(&mut response, &mut sign_error_label),
+                default => sign_error_label.set_text(format!("Failed to signin. Try another credentials. Status: {}", default).trim())
             },
             Err(e) => {
                 sign_error_label.set_text("Failed to sign in. Try another credentials.");
                 godot_error!("Error on signin: {}", e)
-            },
+            }
         };
+    }
+
+    fn handle_ok_response(&mut self, response: &mut Response, label: &mut Label) {
+        let mut body: String = String::new();
+        let _ = response.read_to_string(&mut body);
+        godot_print_rich!("Body: {}", body);
+        godot_print_rich!("Sign response: {:?}", &response);
+        godot_print_rich!(
+            "Sign status: {}",
+            response.status()
+        );
+        label.set_text("");
+        self.goto_players_list();
     }
 
     fn goto_players_list(&mut self) {
@@ -89,13 +122,18 @@ impl AuthHud {
         Ok(pass)
     }
 
-    fn send_request(&mut self, login: String, pass: String) -> Result<Response, reqwest::Error> {
+    fn send_auth_request(
+        &mut self,
+        login: String,
+        pass: String,
+        uri: &str,
+    ) -> Result<Response, reqwest::Error> {
         let mut body = HashMap::new();
         body.insert("login", login);
         body.insert("pass", pass);
         let signin_res = self
             .client
-            .post("http://localhost:8080/signin")
+            .post(format!("{}/{}", HOST, uri))
             .json(&body)
             .send();
         match signin_res {
