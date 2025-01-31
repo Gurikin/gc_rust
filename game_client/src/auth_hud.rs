@@ -1,13 +1,18 @@
 use std::{collections::HashMap, io::Read};
 
 use godot::{
-    classes::{CanvasLayer, Control, IControl, Label, LineEdit},
+    classes::{CanvasLayer, Control, IControl, ItemList, Label, LineEdit},
     global::Error,
     prelude::*,
 };
-use reqwest::{blocking::{Client, Response}, StatusCode};
+use reqwest::{
+    blocking::{Client, Response},
+    StatusCode,
+};
 
-const HOST: &'static str = "http://localhost:8080";
+use crate::dto::UserStatusDto;
+
+const HOST: &str = "http://localhost:8080";
 
 #[derive(GodotClass)]
 #[class(base=Control)]
@@ -44,7 +49,13 @@ impl AuthHud {
         match self.send_auth_request(login.unwrap(), pass.unwrap(), "signup") {
             Ok(mut response) => match response.status() {
                 StatusCode::OK => self.handle_ok_response(&mut response, &mut sign_error_label),
-                default => sign_error_label.set_text(format!("Failed to signup. Try another credentials. Status: {}", default).trim())
+                default => sign_error_label.set_text(
+                    format!(
+                        "Failed to signup. Try another credentials. Status: {}",
+                        default
+                    )
+                    .trim(),
+                ),
             },
             Err(e) => {
                 sign_error_label.set_text("Failed to signup. Try another credentials.");
@@ -67,7 +78,13 @@ impl AuthHud {
         match self.send_auth_request(login.unwrap(), pass.unwrap(), "signin") {
             Ok(mut response) => match response.status() {
                 StatusCode::OK => self.handle_ok_response(&mut response, &mut sign_error_label),
-                default => sign_error_label.set_text(format!("Failed to signin. Try another credentials. Status: {}", default).trim())
+                default => sign_error_label.set_text(
+                    format!(
+                        "Failed to signin. Try another credentials. Status: {}",
+                        default
+                    )
+                    .trim(),
+                ),
             },
             Err(e) => {
                 sign_error_label.set_text("Failed to sign in. Try another credentials.");
@@ -76,15 +93,41 @@ impl AuthHud {
         };
     }
 
+    #[func]
+    fn on_players_request(&mut self) {
+        godot_print_rich!("Pla pressed");
+        let player_list_layer = self
+            .base_mut()
+            .get_node_as::<CanvasLayer>("PlayersListLayer");
+        let mut player_item_list = player_list_layer.get_node_as::<ItemList>("PlayerList");
+        let res = self.client.get(format!("{}/{}", HOST, "user/all")).send();
+        let player_list: Vec<UserStatusDto> = match res {
+            Ok(mut response) => {
+                let mut body: String = String::new();
+                let _ = response.read_to_string(&mut body);
+                godot_print!("{}", &body);
+                serde_json::from_str(&body).map_err(|e| godot_print!("{}", e)).unwrap_or(vec![])
+            }
+            Err(e) => {
+                godot_error!("{}", e);
+                vec![]
+            },
+        };
+        if player_list.is_empty() {
+            return;
+        }
+        for player in player_list.iter() {
+            godot_print!("{:?}", &player);
+            player_item_list.add_item(format!("{} => {}", player.nick, if player.is_online {"online"} else {"offline"}).trim());
+        }
+    }
+
     fn handle_ok_response(&mut self, response: &mut Response, label: &mut Label) {
         let mut body: String = String::new();
         let _ = response.read_to_string(&mut body);
         godot_print_rich!("Body: {}", body);
         godot_print_rich!("Sign response: {:?}", &response);
-        godot_print_rich!(
-            "Sign status: {}",
-            response.status()
-        );
+        godot_print_rich!("Sign status: {}", response.status());
         label.set_text("");
         self.goto_players_list();
     }
@@ -131,12 +174,12 @@ impl AuthHud {
         let mut body = HashMap::new();
         body.insert("login", login);
         body.insert("pass", pass);
-        let signin_res = self
+        let sign_res = self
             .client
             .post(format!("{}/{}", HOST, uri))
             .json(&body)
             .send();
-        match signin_res {
+        match sign_res {
             Ok(response) => Ok(response),
             Err(e) => Err(e),
         }
