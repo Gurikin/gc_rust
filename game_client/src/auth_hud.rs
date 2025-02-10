@@ -1,7 +1,7 @@
 use std::{collections::HashMap, io::Read};
 
 use godot::{
-    classes::{CanvasLayer, Control, IControl, ItemList, Label, LineEdit},
+    classes::{Button, CanvasLayer, Control, IControl, ItemList, Label, LineEdit},
     global::Error,
     prelude::*,
 };
@@ -106,19 +106,32 @@ impl AuthHud {
                 let mut body: String = String::new();
                 let _ = response.read_to_string(&mut body);
                 godot_print!("{}", &body);
-                serde_json::from_str(&body).map_err(|e| godot_print!("{}", e)).unwrap_or(vec![])
+                serde_json::from_str(&body)
+                    .map_err(|e| godot_print!("{}", e))
+                    .unwrap_or(vec![])
             }
             Err(e) => {
                 godot_error!("{}", e);
                 vec![]
-            },
+            }
         };
         if player_list.is_empty() {
             return;
         }
         for player in player_list.iter() {
             godot_print!("{:?}", &player);
-            player_item_list.add_item(format!("{} => {}", player.nick, if player.is_online {"online"} else {"offline"}).trim());
+            player_item_list.add_item(
+                format!(
+                    "{} => {}",
+                    player.login,
+                    if player.is_online {
+                        "online"
+                    } else {
+                        "offline"
+                    }
+                )
+                .trim(),
+            );
         }
     }
 
@@ -140,6 +153,9 @@ impl AuthHud {
 
         auth_layer.set_visible(false);
         player_list_layer.set_visible(true);
+        player_list_layer
+            .get_node_as::<Button>("PlayersRequestButton")
+            .grab_focus();
         godot_print_rich!("Switch layers: OK");
     }
 
@@ -194,5 +210,11 @@ impl IControl for AuthHud {
         let hud = AuthHud { client, base };
         godot_print_rich!("Init Hud: OK");
         hud
+    }
+
+    fn ready(&mut self) {
+        let auth_layer = self.base_mut().get_node_as::<CanvasLayer>("AuthLayer");
+        let mut login_input = auth_layer.get_node_as::<LineEdit>("LoginInput");
+        login_input.grab_focus();
     }
 }
