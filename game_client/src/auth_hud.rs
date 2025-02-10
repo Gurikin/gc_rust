@@ -10,7 +10,7 @@ use reqwest::{
     StatusCode,
 };
 
-use crate::dto::UserStatusDto;
+use crate::dto::{UserStatusDto, UserTokenDto};
 
 const HOST: &str = "http://localhost:8080";
 
@@ -18,6 +18,7 @@ const HOST: &str = "http://localhost:8080";
 #[class(base=Control)]
 pub struct AuthHud {
     client: Client,
+    user_token: Option<UserTokenDto>,
     base: Base<Control>,
 }
 
@@ -100,7 +101,15 @@ impl AuthHud {
             .base_mut()
             .get_node_as::<CanvasLayer>("PlayersListLayer");
         let mut player_item_list = player_list_layer.get_node_as::<ItemList>("PlayerList");
-        let res = self.client.get(format!("{}/{}", HOST, "user/all")).send();
+        let token = self.user_token.clone().unwrap();
+        let body = serde_json::to_string(&token)
+        .unwrap_or("{}".to_string());
+        let res = self
+            .client
+            .post(format!("{}/{}", HOST, "user/all"))
+            .body(body)
+            .header("Content-Type", "application/json")
+            .send();
         let player_list: Vec<UserStatusDto> = match res {
             Ok(mut response) => {
                 let mut body: String = String::new();
@@ -138,6 +147,8 @@ impl AuthHud {
     fn handle_ok_response(&mut self, response: &mut Response, label: &mut Label) {
         let mut body: String = String::new();
         let _ = response.read_to_string(&mut body);
+        let user_token = serde_json::from_str::<UserTokenDto>(body.trim());
+        self.user_token = user_token.ok();
         godot_print_rich!("Body: {}", body);
         godot_print_rich!("Sign response: {:?}", &response);
         godot_print_rich!("Sign status: {}", response.status());
@@ -207,7 +218,11 @@ impl IControl for AuthHud {
     fn init(base: Base<Self::Base>) -> Self {
         godot_print_rich!("Init Hud: Begin");
         let client = reqwest::blocking::Client::new();
-        let hud = AuthHud { client, base };
+        let hud = AuthHud {
+            client,
+            user_token: None,
+            base,
+        };
         godot_print_rich!("Init Hud: OK");
         hud
     }
