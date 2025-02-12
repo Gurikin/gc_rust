@@ -10,20 +10,20 @@ use reqwest::{
     StatusCode,
 };
 
-use crate::dto::{UserStatusDto, UserTokenDto};
+use crate::dto::{UserSessionDto, UserTokenDto};
 
 const HOST: &str = "http://localhost:8080";
 
 #[derive(GodotClass)]
 #[class(base=Control)]
-pub struct AuthHud {
+pub struct StartGameHud {
     client: Client,
     user_token: Option<UserTokenDto>,
     base: Base<Control>,
 }
 
 #[godot_api]
-impl AuthHud {
+impl StartGameHud {
     #[func]
     fn on_ready(&mut self) {
         let mut auth_layer = self.base_mut().get_node_as::<CanvasLayer>("AuthLayer");
@@ -95,7 +95,7 @@ impl AuthHud {
     }
 
     #[func]
-    fn on_players_request(&mut self) {
+    fn on_vacant_sessions_request(&mut self) {
         godot_print_rich!("Pla pressed");
         let player_list_layer = self
             .base_mut()
@@ -106,11 +106,11 @@ impl AuthHud {
         .unwrap_or("{}".to_string());
         let res = self
             .client
-            .post(format!("{}/{}", HOST, "user/all"))
+            .get(format!("{}/{}", HOST, "session"))
             .body(body)
             .header("Content-Type", "application/json")
             .send();
-        let player_list: Vec<UserStatusDto> = match res {
+        let player_list: Vec<UserSessionDto> = match res {
             Ok(mut response) => {
                 let mut body: String = String::new();
                 let _ = response.read_to_string(&mut body);
@@ -131,13 +131,14 @@ impl AuthHud {
             godot_print!("{:?}", &player);
             player_item_list.add_item(
                 format!(
-                    "{} => {}",
-                    player.login,
-                    if player.is_online {
+                    "{} => {} => {}",
+                    player.user1.login,
+                    if player.user1.is_online {
                         "online"
                     } else {
                         "offline"
-                    }
+                    },
+                    player.session_id
                 )
                 .trim(),
             );
@@ -214,11 +215,11 @@ impl AuthHud {
 }
 
 #[godot_api]
-impl IControl for AuthHud {
+impl IControl for StartGameHud {
     fn init(base: Base<Self::Base>) -> Self {
         godot_print_rich!("Init Hud: Begin");
         let client = reqwest::blocking::Client::new();
-        let hud = AuthHud {
+        let hud = StartGameHud {
             client,
             user_token: None,
             base,

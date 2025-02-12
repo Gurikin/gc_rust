@@ -1,6 +1,6 @@
 use godot::prelude::*;
 
-pub mod auth_hud;
+pub mod start_game_hud;
 pub mod board;
 pub mod dto;
 

@@ -5,5 +5,4 @@ resolver = "2"
 members = [
     "go_udp_request",
     "game_client",
-    "go_quic_client",
 ]
