@@ -19,3 +19,9 @@ pub struct UserSessionDto {
     pub user2: Option<UserStatusDto>,
     pub session_id: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserSessionRequestDto {
+    pub user_id: i64,
+    pub session_id: Option<String>,
+}

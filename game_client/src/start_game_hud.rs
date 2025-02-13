@@ -10,7 +10,7 @@ use reqwest::{
     StatusCode,
 };
 
-use crate::dto::{UserSessionDto, UserTokenDto};
+use crate::dto::{UserSessionDto, UserSessionRequestDto, UserTokenDto};
 
 const HOST: &str = "http://localhost:8080";
 
@@ -96,14 +96,13 @@ impl StartGameHud {
 
     #[func]
     fn on_vacant_sessions_request(&mut self) {
-        godot_print_rich!("Pla pressed");
+        godot_print_rich!("Get Vacant sessions pressed");
         let player_list_layer = self
             .base_mut()
             .get_node_as::<CanvasLayer>("PlayersListLayer");
         let mut player_item_list = player_list_layer.get_node_as::<ItemList>("PlayerList");
         let token = self.user_token.clone().unwrap();
-        let body = serde_json::to_string(&token)
-        .unwrap_or("{}".to_string());
+        let body = serde_json::to_string(&token).unwrap_or("{}".to_string());
         let res = self
             .client
             .get(format!("{}/{}", HOST, "session"))
@@ -131,7 +130,7 @@ impl StartGameHud {
             godot_print!("{:?}", &player);
             player_item_list.add_item(
                 format!(
-                    "{} => {} => {}",
+                    "{}=>{}=>{}",
                     player.user1.login,
                     if player.user1.is_online {
                         "online"
@@ -143,6 +142,41 @@ impl StartGameHud {
                 .trim(),
             );
         }
+    }
+
+    #[func]
+    fn on_double_click_join_session(
+        &mut self,
+        index: i32,
+        _at_position: Vector2,
+        _mouse_button_index: i32,
+    ) {
+        godot_print_rich!("Join to session clicked");
+        let player_list_layer = self
+            .base_mut()
+            .get_node_as::<CanvasLayer>("PlayersListLayer");
+        let mut player_item_list = player_list_layer.get_node_as::<ItemList>("PlayerList");
+        let item = player_item_list.get_item_text(index);
+        let session_id = item.split("=>").get(2).map(|s| s.to_string());
+        if session_id.is_none() {
+            return;
+        }
+        let user_id = self.user_token.clone().unwrap().user_id;
+        let body = UserSessionRequestDto {
+            user_id: user_id,
+            session_id: session_id,
+        };
+        let body = serde_json::to_string(&body).unwrap_or("{}".to_string());
+        let res = self
+            .client
+            .post(format!("{}/{}", HOST, "session"))
+            .body(body)
+            .header("Content-Type", "application/json")
+            .send();
+        match res {
+            Ok(_) => /*go to game scene*/player_item_list.set_visible(false),
+            Err(e) => godot_error!("{}", e),
+        };
     }
 
     fn handle_ok_response(&mut self, response: &mut Response, label: &mut Label) {
