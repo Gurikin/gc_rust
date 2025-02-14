@@ -10,7 +10,10 @@ use reqwest::{
     StatusCode,
 };
 
-use crate::dto::{UserSessionDto, UserSessionRequestDto, UserTokenDto};
+use crate::{
+    dto::{UserSessionDto, UserSessionRequestDto, UserTokenDto},
+    master_scene::MasterScene,
+};
 
 const HOST: &str = "http://localhost:8080";
 
@@ -24,18 +27,6 @@ pub struct StartGameHud {
 
 #[godot_api]
 impl StartGameHud {
-    #[func]
-    fn on_ready(&mut self) {
-        let mut auth_layer = self.base_mut().get_node_as::<CanvasLayer>("AuthLayer");
-        let mut player_list_layer = self
-            .base_mut()
-            .get_node_as::<CanvasLayer>("PlayersListLayer");
-
-        auth_layer.set_visible(true);
-        player_list_layer.set_visible(false);
-        godot_print_rich!("Set layers: OK");
-    }
-
     #[func]
     fn on_signup(&mut self) {
         godot_print_rich!("Signup pressed");
@@ -145,6 +136,35 @@ impl StartGameHud {
     }
 
     #[func]
+    fn on_create_sessions_request(&mut self) {
+        godot_print_rich!("Get Vacant sessions pressed");
+        let player_list_layer = self
+            .base_mut()
+            .get_node_as::<CanvasLayer>("PlayersListLayer");
+        let mut player_item_list = player_list_layer.get_node_as::<ItemList>("PlayerList");
+        let user_id = self.user_token.clone().unwrap().user_id;
+        let body = UserSessionRequestDto {
+            user_id,
+            session_id: None,
+        };
+        let body = serde_json::to_string(&body).unwrap_or("{}".to_string());
+        let res = self
+            .client
+            .post(format!("{}/{}", HOST, "session"))
+            .body(body)
+            .header("Content-Type", "application/json")
+            .send();
+        match res {
+            Ok(_) =>
+            /*go to game scene*/
+            {
+                player_item_list.set_visible(false)
+            }
+            Err(e) => godot_error!("{}", e),
+        };
+    }
+
+    #[func]
     fn on_double_click_join_session(
         &mut self,
         index: i32,
@@ -155,7 +175,7 @@ impl StartGameHud {
         let player_list_layer = self
             .base_mut()
             .get_node_as::<CanvasLayer>("PlayersListLayer");
-        let mut player_item_list = player_list_layer.get_node_as::<ItemList>("PlayerList");
+        let player_item_list = player_list_layer.get_node_as::<ItemList>("PlayerList");
         let item = player_item_list.get_item_text(index);
         let session_id = item.split("=>").get(2).map(|s| s.to_string());
         if session_id.is_none() {
@@ -163,8 +183,8 @@ impl StartGameHud {
         }
         let user_id = self.user_token.clone().unwrap().user_id;
         let body = UserSessionRequestDto {
-            user_id: user_id,
-            session_id: session_id,
+            user_id,
+            session_id,
         };
         let body = serde_json::to_string(&body).unwrap_or("{}".to_string());
         let res = self
@@ -174,10 +194,25 @@ impl StartGameHud {
             .header("Content-Type", "application/json")
             .send();
         match res {
-            Ok(_) => /*go to game scene*/player_item_list.set_visible(false),
+            Ok(user_session_response) =>
+            /*go to game scene*/
+            {
+                let master_scene: Gd<PackedScene> = load("res://content/scenes/Master.tscn");
+                let mut master_scene = master_scene.instantiate_as::<MasterScene>();
+                master_scene.bind_mut().init_session(
+                    serde_json::from_str(user_session_response.text().unwrap().as_str()).unwrap(),
+                );
+                self.base().get_tree().and_then(|t| t.get_root()).unwrap().add_child(&master_scene);
+                player_list_layer.clone().set_visible(false);
+            }
             Err(e) => godot_error!("{}", e),
         };
     }
+
+    // #[func]
+    // pub fn free_scene(&mut self) {
+    //     self.base().get_node_as::<Self>("/root/Hud").free();
+    // }
 
     fn handle_ok_response(&mut self, response: &mut Response, label: &mut Label) {
         let mut body: String = String::new();
@@ -200,7 +235,7 @@ impl StartGameHud {
         auth_layer.set_visible(false);
         player_list_layer.set_visible(true);
         player_list_layer
-            .get_node_as::<Button>("PlayersRequestButton")
+            .get_node_as::<Button>("SessionsRequestButton")
             .grab_focus();
         godot_print_rich!("Switch layers: OK");
     }
@@ -263,7 +298,16 @@ impl IControl for StartGameHud {
     }
 
     fn ready(&mut self) {
-        let auth_layer = self.base_mut().get_node_as::<CanvasLayer>("AuthLayer");
+        let mut auth_layer = self.base_mut().get_node_as::<CanvasLayer>("AuthLayer");
+        let mut player_list_layer = self
+            .base_mut()
+            .get_node_as::<CanvasLayer>("PlayersListLayer");
+
+        auth_layer.set_visible(true);
+        player_list_layer.set_visible(false);
+        godot_print_rich!("Set layers: OK");
+
+        // let auth_layer = self.base_mut().get_node_as::<CanvasLayer>("AuthLayer");
         let mut login_input = auth_layer.get_node_as::<LineEdit>("LoginInput");
         login_input.grab_focus();
     }
