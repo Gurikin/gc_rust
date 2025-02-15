@@ -14,3 +14,4 @@ log = { version = "0.4", features = ["std"] }
 log4rs = "1"
 reqwest = { version = "0.12.12", features = ["blocking", "json"] }
 go_udp_request = { path = "../go_udp_request" }
+chrono = "0.4.39"

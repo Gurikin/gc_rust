@@ -1,4 +1,7 @@
-use godot::prelude::*;
+use std::time::SystemTime;
+
+use chrono::{DateTime, Utc};
+use godot::{classes::Timer, prelude::*};
 
 use crate::dto::{UserSessionDto, UserSessionRequestDto, UserTokenDto};
 
@@ -41,6 +44,7 @@ impl MasterScene {
 
     #[func]
     pub fn on_game_state_tick(&mut self) {
+        godot_print!("Send game state request: Begin");
         let body_str = serde_json::to_string(&self.session_request).unwrap_or("{}".to_string());
         match self
             .client
@@ -55,6 +59,10 @@ impl MasterScene {
                 return;
             }
         }
+        let now = SystemTime::now();
+        let datetime: DateTime<Utc> = now.into();
+        println!("{}", datetime.format("%d/%m/%Y %T"));
+        godot_print!("{}:\tSend game state request: Ok", datetime.format("%Y"));
     }
 }
 
@@ -76,5 +84,7 @@ impl INode2D for MasterScene {
             user_id: self.get_user_id(),
             session_id: self.get_session_id(),
         });
+        let mut game_state_timer = self.base().get_node_as::<Timer>("GameStateTimer");
+        game_state_timer.start();
     }
 }
