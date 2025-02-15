@@ -199,10 +199,15 @@ impl StartGameHud {
             {
                 let master_scene: Gd<PackedScene> = load("res://content/scenes/Master.tscn");
                 let mut master_scene = master_scene.instantiate_as::<MasterScene>();
-                master_scene.bind_mut().init_session(
+                master_scene.bind_mut().init_game_data(
                     serde_json::from_str(user_session_response.text().unwrap().as_str()).unwrap(),
+                    self.user_token.clone(),
                 );
-                self.base().get_tree().and_then(|t| t.get_root()).unwrap().add_child(&master_scene);
+                self.base()
+                    .get_tree()
+                    .and_then(|t| t.get_root())
+                    .unwrap()
+                    .add_child(&master_scene);
                 player_list_layer.clone().set_visible(false);
             }
             Err(e) => godot_error!("{}", e),
