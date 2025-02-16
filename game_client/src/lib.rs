@@ -5,6 +5,7 @@ pub mod dto;
 pub mod game_data;
 pub mod master_scene;
 pub mod start_game_hud;
+pub mod util;
 
 struct GoClient;
 

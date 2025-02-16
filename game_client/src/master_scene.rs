@@ -1,9 +1,9 @@
-use std::time::SystemTime;
+use godot::{
+    classes::{CanvasLayer, Control, Label, Timer},
+    prelude::*,
+};
 
-use chrono::{DateTime, Utc};
-use godot::{classes::Timer, prelude::*};
-
-use crate::dto::{UserSessionDto, UserSessionRequestDto, UserTokenDto};
+use crate::{dto::{GameScore, GameStateDto, UserSessionDto, UserSessionRequestDto, UserTokenDto}, util::get_format_time};
 
 use reqwest::blocking::Client;
 
@@ -53,19 +53,45 @@ impl MasterScene {
             .header("Content-Type", "application/json")
             .send()
         {
-            Ok(response) => godot_print!("{:?}", response.text()),
+            Ok(response) => {
+                let game_state = serde_json::from_str::<GameStateDto>(response.text().unwrap_or("{}".to_string()).trim()).unwrap();
+                self.refresh_time(get_format_time(Some("%T")));
+                self.refresh_score(game_state.game_state.score);
+            },
             Err(e) => {
                 godot_error!("Error: {:?}", e);
                 return;
             }
         }
-        let now = SystemTime::now();
-        let datetime: DateTime<Utc> = now.into();
-        println!("{}", datetime.format("%d/%m/%Y %T"));
         godot_print!(
             "{}:\tSend game state request: Ok",
-            datetime.format("%Y-%m-%d'T'%T")
+            get_format_time(None)
         );
+    }
+
+    #[func]
+    fn refresh_time(&mut self, game_state_refresh_time: String) {
+        let mut time_label = self
+            .base()
+            .get_node_as::<Control>("GameInfoControl")
+            .get_node_as::<CanvasLayer>("GameInfo")
+            .get_node_as::<Label>("TimeLabel");
+        time_label.set_text(&game_state_refresh_time);
+    }
+
+    fn refresh_score(&mut self, score: GameScore) {
+        let game_info = self
+            .base()
+            .get_node_as::<Control>("GameInfoControl")
+            .get_node_as::<CanvasLayer>("GameInfo");
+        let mut black_score_label = game_info
+            .get_node_as::<Label>("BlackTitleLabel")
+            .get_node_as::<Label>("BlackScoreLabel");
+        black_score_label.set_text(&score.black.to_string());
+        let mut black_score_label = game_info
+            .get_node_as::<Label>("WhiteTitleLabel")
+            .get_node_as::<Label>("WhiteScoreLabel");
+        black_score_label.set_text(&score.white.to_string());
     }
 }
 
