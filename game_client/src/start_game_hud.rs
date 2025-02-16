@@ -141,7 +141,6 @@ impl StartGameHud {
         let player_list_layer = self
             .base_mut()
             .get_node_as::<CanvasLayer>("PlayersListLayer");
-        let mut player_item_list = player_list_layer.get_node_as::<ItemList>("PlayerList");
         let user_id = self.user_token.clone().unwrap().user_id;
         let body = UserSessionRequestDto {
             user_id,
@@ -155,10 +154,24 @@ impl StartGameHud {
             .header("Content-Type", "application/json")
             .send();
         match res {
-            Ok(_) =>
+            Ok(user_session_response) =>
             /*go to game scene*/
             {
-                player_item_list.set_visible(false)
+                let master_scene: Gd<PackedScene> = load("res://content/scenes/Master.tscn");
+                let mut master_scene = master_scene.instantiate_as::<MasterScene>();
+                master_scene.bind_mut().init_game_data(
+                    serde_json::from_str::<Option<UserSessionDto>>(
+                        user_session_response.text().unwrap().as_str(),
+                    )
+                    .unwrap(),
+                    self.user_token.clone(),
+                );
+                self.base()
+                    .get_tree()
+                    .and_then(|t| t.get_root())
+                    .unwrap()
+                    .add_child(&master_scene);
+                player_list_layer.clone().set_visible(false);
             }
             Err(e) => godot_error!("{}", e),
         };
@@ -189,7 +202,7 @@ impl StartGameHud {
         let body = serde_json::to_string(&body).unwrap_or("{}".to_string());
         let res = self
             .client
-            .post(format!("{}/{}", HOST, "session"))
+            .patch(format!("{}/{}", HOST, "session"))
             .body(body)
             .header("Content-Type", "application/json")
             .send();
@@ -200,7 +213,10 @@ impl StartGameHud {
                 let master_scene: Gd<PackedScene> = load("res://content/scenes/Master.tscn");
                 let mut master_scene = master_scene.instantiate_as::<MasterScene>();
                 master_scene.bind_mut().init_game_data(
-                    serde_json::from_str(user_session_response.text().unwrap().as_str()).unwrap(),
+                    serde_json::from_str::<Option<UserSessionDto>>(
+                        user_session_response.text().unwrap().as_str(),
+                    )
+                    .unwrap(),
                     self.user_token.clone(),
                 );
                 self.base()

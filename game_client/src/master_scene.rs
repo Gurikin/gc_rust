@@ -62,7 +62,10 @@ impl MasterScene {
         let now = SystemTime::now();
         let datetime: DateTime<Utc> = now.into();
         println!("{}", datetime.format("%d/%m/%Y %T"));
-        godot_print!("{}:\tSend game state request: Ok", datetime.format("%Y-%m-%d'T'%T"));
+        godot_print!(
+            "{}:\tSend game state request: Ok",
+            datetime.format("%Y-%m-%d'T'%T")
+        );
     }
 }
 
