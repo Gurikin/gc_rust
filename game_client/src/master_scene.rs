@@ -3,7 +3,10 @@ use godot::{
     prelude::*,
 };
 
-use crate::{dto::{GameScore, GameStateDto, UserSessionDto, UserSessionRequestDto, UserTokenDto}, util::get_format_time};
+use crate::{
+    dto::{GameScore, GameStateDto, UserSessionDto, UserSessionRequestDto, UserTokenDto},
+    util::get_format_time,
+};
 
 use reqwest::blocking::Client;
 
@@ -54,19 +57,19 @@ impl MasterScene {
             .send()
         {
             Ok(response) => {
-                let game_state = serde_json::from_str::<GameStateDto>(response.text().unwrap_or("{}".to_string()).trim()).unwrap();
+                let game_state = serde_json::from_str::<GameStateDto>(
+                    response.text().unwrap_or("{}".to_string()).trim(),
+                )
+                .unwrap();
                 self.refresh_time(get_format_time(Some("%T")));
                 self.refresh_score(game_state.game_state.score);
-            },
+            }
             Err(e) => {
                 godot_error!("Error: {:?}", e);
                 return;
             }
         }
-        godot_print!(
-            "{}:\tSend game state request: Ok",
-            get_format_time(None)
-        );
+        godot_print!("{}:\tSend game state request: Ok", get_format_time(None));
     }
 
     #[func]

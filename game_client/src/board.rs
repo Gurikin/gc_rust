@@ -1,10 +1,11 @@
-use godot::classes::{ISprite2D, InputEvent, InputEventMouse, Sprite2D};
+use godot::classes::{Area2D, ISprite2D, Sprite2D};
 use godot::prelude::*;
+
+use crate::stone_place::StonePlace;
 
 #[derive(GodotClass)]
 #[class(base=Sprite2D)]
 pub struct Board {
-    input: Gd<Input>,
     base: Base<Sprite2D>,
 }
 
@@ -13,21 +14,22 @@ impl ISprite2D for Board {
     fn init(base: Base<Self::Base>) -> Self {
         godot_print!("Make a board...");
         Self {
-            input: Input::singleton(),
             base,
         }
     }
 
-    fn physics_process(&mut self, _: f64) {}
-
-    fn input(&mut self, event: Gd<InputEvent>) {
-        if self.input.is_action_pressed("put_stone") {
-            if let Ok(mouse_event) = event.try_cast::<InputEventMouse>() {
-                godot_print!(
-                    "Left button was clicked at {},{}",
-                    mouse_event.get_position().x - 484.0,
-                    mouse_event.get_position().y - 64.0
-                );
+    fn ready(&mut self) {
+        let mut area = self.base().get_node_as::<Area2D>("Area2D");
+        for row in 0..19 {
+            for col in 0..19 {
+                let stone_place_scene: Gd<PackedScene> =
+                    load("res://content/Framework/StonePlace.tscn");
+                let mut stone_place_item = stone_place_scene.instantiate_as::<StonePlace>();
+                stone_place_item.set_meta("Row", &Variant::from(row));
+                stone_place_item.set_meta("Col", &Variant::from(col));
+                let position = Vector2::new(row as f32 * 50.0, col as f32 * 50.0);
+                stone_place_item.set_position(position);
+                area.add_child(&stone_place_item);
             }
         }
     }

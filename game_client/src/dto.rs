@@ -49,4 +49,3 @@ pub struct GameScore {
     pub black: i32,
     pub white: i32,
 }
-
