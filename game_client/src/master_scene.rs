@@ -4,7 +4,10 @@ use godot::{
 };
 
 use crate::{
-    dto::{GameScore, GameStateDto, UserSessionDto, UserSessionRequestDto, UserTokenDto},
+    board::Board,
+    dto::{
+        GameScore, GameState, GameStateDto, UserSessionDto, UserSessionRequestDto, UserTokenDto,
+    },
     util::get_format_time,
 };
 
@@ -62,7 +65,8 @@ impl MasterScene {
                 )
                 .unwrap();
                 self.refresh_time(get_format_time(Some("%T")));
-                self.refresh_score(game_state.game_state.score);
+                self.refresh_score(&game_state.game_state.score);
+                self.refresh_board(&game_state.game_state);
             }
             Err(e) => {
                 godot_error!("Error: {:?}", e);
@@ -82,7 +86,7 @@ impl MasterScene {
         time_label.set_text(&game_state_refresh_time);
     }
 
-    fn refresh_score(&mut self, score: GameScore) {
+    fn refresh_score(&mut self, score: &GameScore) {
         let game_info = self
             .base()
             .get_node_as::<Control>("GameInfoControl")
@@ -95,6 +99,41 @@ impl MasterScene {
             .get_node_as::<Label>("WhiteTitleLabel")
             .get_node_as::<Label>("WhiteScoreLabel");
         black_score_label.set_text(&score.white.to_string());
+    }
+
+    fn refresh_board(&mut self, game_state: &GameState) {
+        // let board_scene: Gd<PackedScene> = load("res://content/framework/Board.tscn");
+        // let board = &mut board_scene.instantiate_as::<Board>();
+        let mut board = self.base().get_node_as::<Board>("Board");
+        // godot_print!("{:?}", board);
+        // return;
+        // let mut row_num = 0;
+        // let mut col_num = 0;
+        for (row_num, row) in game_state.board.iter().enumerate() {
+            for (col_num, col) in row.iter().enumerate() {
+                //hud.connect("start_game", &mob.callable("on_start_game"));
+                let color = match col {
+                    Some(b) => {
+                        if *b {
+                            GString::from("black")
+                        } else {
+                            GString::from("white")
+                        }
+                    }
+                    None => GString::from("none"),
+                };
+                board.call(
+                    "on_put_stone",
+                    &[
+                        Variant::from(row_num as i32),
+                        Variant::from(col_num as i32),
+                        Variant::from(color),
+                    ],
+                );
+                // col_num += 1;
+            }
+            // row_num += 1;
+        }
     }
 }
 
