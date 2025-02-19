@@ -1,4 +1,4 @@
-use godot::classes::{IStaticBody2D, InputEvent, Sprite2D, StaticBody2D};
+use godot::classes::{IStaticBody2D, InputEvent, StaticBody2D};
 use godot::prelude::*;
 
 #[derive(GodotClass)]
@@ -37,7 +37,12 @@ impl IStaticBody2D for StonePlace {
         {
             let row = self.base().get_meta("Row");
             let col = self.base().get_meta("Col");
-            godot_print!("Stone is putted to {}:{}. Position: {}", row, col, self.base().get_global_position());
+            godot_print!(
+                "Stone is putted to {}:{}. Position: {}",
+                row,
+                col,
+                self.base().get_global_position()
+            );
         }
     }
 }

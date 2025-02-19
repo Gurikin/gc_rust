@@ -41,11 +41,11 @@ impl MasterScene {
     }
 
     fn get_user_id(&mut self) -> i64 {
-        self.token.clone().map(|t| t.user_id).unwrap_or(-1)
+        2 //self.token.clone().map(|t| t.user_id).unwrap_or(-1)
     }
 
     fn get_session_id(&mut self) -> Option<String> {
-        self.session.clone().map(|t| t.session_id)
+        Some(String::from("8e2db1b1-6b1a-48ae-b44b-10fe5f47ffcd")) //self.session.clone().map(|t| t.session_id)
     }
 
     #[func]
@@ -70,7 +70,6 @@ impl MasterScene {
             }
             Err(e) => {
                 godot_error!("Error: {:?}", e);
-                return;
             }
         }
         // godot_print!("{}:\tSend game state request: Ok", get_format_time(None));
@@ -152,8 +151,8 @@ impl INode2D for MasterScene {
 
     fn ready(&mut self) {
         self.session_request = Some(UserSessionRequestDto {
-            user_id: 2,//self.get_user_id(),
-            session_id: Some(String::from("8e2db1b1-6b1a-48ae-b44b-10fe5f47ffcd")),//self.get_session_id(),
+            user_id: self.get_user_id(),
+            session_id: self.get_session_id(),
         });
         let mut game_state_timer = self.base().get_node_as::<Timer>("GameStateTimer");
         game_state_timer.start();
