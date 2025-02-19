@@ -21,12 +21,6 @@ impl IStaticBody2D for StonePlace {
         }
     }
 
-    // fn ready(&mut self) {
-    //     let mut stone = self.base().get_node_as::<Sprite2D>("BlackStone");
-    //     godot_print!("Stone: {:?}", stone);
-    //     stone.set_visible(true);
-    // }
-
     fn input(&mut self, _: Gd<InputEvent>) {
         if self.input.is_action_pressed("put_stone")
             && self
