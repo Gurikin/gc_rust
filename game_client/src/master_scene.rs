@@ -50,7 +50,7 @@ impl MasterScene {
 
     #[func]
     pub fn on_game_state_tick(&mut self) {
-        godot_print!("Send game state request: Begin");
+        // godot_print!("Send game state request: Begin");
         let body_str = serde_json::to_string(&self.session_request).unwrap_or("{}".to_string());
         match self
             .client
@@ -73,7 +73,7 @@ impl MasterScene {
                 return;
             }
         }
-        godot_print!("{}:\tSend game state request: Ok", get_format_time(None));
+        // godot_print!("{}:\tSend game state request: Ok", get_format_time(None));
     }
 
     #[func]
@@ -152,8 +152,8 @@ impl INode2D for MasterScene {
 
     fn ready(&mut self) {
         self.session_request = Some(UserSessionRequestDto {
-            user_id: self.get_user_id(),
-            session_id: self.get_session_id(),
+            user_id: 2,//self.get_user_id(),
+            session_id: Some(String::from("8e2db1b1-6b1a-48ae-b44b-10fe5f47ffcd")),//self.get_session_id(),
         });
         let mut game_state_timer = self.base().get_node_as::<Timer>("GameStateTimer");
         game_state_timer.start();

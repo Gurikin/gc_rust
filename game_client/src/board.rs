@@ -1,4 +1,4 @@
-use godot::classes::{Area2D, ISprite2D, Sprite2D};
+use godot::classes::{resource, resource_loader, Area2D, ISprite2D, ResourcePreloader, Sprite2D, Texture, Texture2D};
 use godot::prelude::*;
 
 use crate::stone_place::StonePlace;
@@ -33,9 +33,6 @@ impl Board {
         let c = c.unwrap();
         let row = row as usize;
         let col = col as usize;
-        // if row > self.stone_place_vec.len() {
-        //     return;
-        // }
         if self.stone_place_vec.get(row).is_none() {
             godot_print!("row is none");
             return;
@@ -44,37 +41,20 @@ impl Board {
             godot_print!("col is none");
             return;
         }
-        // if col > self.stone_place_vec.get(row).unwrap().len() {
-        //     return;
-        // }
         let stone_place = self.stone_place_vec.get(row).unwrap().get(col).unwrap();
-        godot_print!("row: {}; col: {}", stone_place.get_meta("Row"), stone_place.get_meta("Col"));
-        godot_print!("Stone Place postition: {:?}", stone_place.get_global_position());
+        // godot_print!("row: {}; col: {}", stone_place.get_meta("Row"), stone_place.get_meta("Col"));
+        // godot_print!("Stone Place postition: {:?}", stone_place.get_global_position());
         let stone_path = match c {
-            true => "BlackStone",
-            false => "WhiteStone",
+            true => "res://content/materials/black_stone.svg",
+            false => "res://content/materials/white_stone.svg",
         };
-        let mut stone = stone_place.get_node_as::<Sprite2D>(stone_path);
-        godot_print!("Stone: {:?}", stone);
-        stone.set_visible(true);
-        godot_print!("Stone visibility is true: {:?}", stone);
-        godot_print!("Stone postition: {:?}", stone.get_global_position());
-        let mut stone = self.base().get_node_as::<Sprite2D>(stone_path);
-        stone.set_visible(true);
-        godot_print!("Stone visibility is true: {:?}", stone);
-        godot_print!("Stone postition: {:?}", stone.get_global_position());
-        
-        // let stone_path = String::from("res::/content/materials/")
-        //     + if c {
-        //         "black_stone.svg"
-        //     } else {
-        //         "white_stone.svg"
-        //     };
-        // let stone: Gd<PackedScene> = load(stone_path.trim());
-        // let mut stone = stone.instantiate_as::<Sprite2D>();
-        // stone.set_position(stone_place.get_position());
-        // let mut area = self.base().get_node_as::<Area2D>("Area2D");
-        // area.add_child(&stone);
+        let mut sprite = Sprite2D::new_alloc();
+        let texture: Gd<Texture2D> = load(stone_path);
+        sprite.set_scale(Vector2::new(2.0, 2.0));
+        sprite.set_texture(&texture);
+        sprite.set_position(stone_place.get_position());
+        let mut area = self.base().get_node_as::<Area2D>("Area2D");
+        area.add_child(&sprite);
     }
 }
 
@@ -97,11 +77,13 @@ impl ISprite2D for Board {
                     load("res://content/Framework/StonePlace.tscn");
                 let mut stone_place_item = stone_place_scene.instantiate_as::<StonePlace>();
                 stone_place_item.set_meta("Row", &Variant::from(row));
-                stone_place_item.set_meta("Col", &Variant::from(col));
+                stone_place_item.set_meta("Col", &Variant::from(col as i32));
                 let position = Vector2::new(row as f32 * 50.0, col as f32 * 50.0);
-                stone_place_item.set_position(position);
+                stone_place_item.set_global_position(position);
+                godot_print!("Added child position: {}", stone_place_item.get_global_position());
                 area.add_child(&stone_place_item);
                 col_vec.push(stone_place_item);
+                godot_print!("Added stone position: {}", col_vec.get(col).unwrap().get_global_position());
             }
             self.stone_place_vec.push(col_vec);
         }

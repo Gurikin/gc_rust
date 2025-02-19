@@ -1,4 +1,4 @@
-use godot::classes::{IStaticBody2D, InputEvent, StaticBody2D};
+use godot::classes::{IStaticBody2D, InputEvent, Sprite2D, StaticBody2D};
 use godot::prelude::*;
 
 #[derive(GodotClass)]
@@ -21,6 +21,12 @@ impl IStaticBody2D for StonePlace {
         }
     }
 
+    // fn ready(&mut self) {
+    //     let mut stone = self.base().get_node_as::<Sprite2D>("BlackStone");
+    //     godot_print!("Stone: {:?}", stone);
+    //     stone.set_visible(true);
+    // }
+
     fn input(&mut self, _: Gd<InputEvent>) {
         if self.input.is_action_pressed("put_stone")
             && self
@@ -31,7 +37,7 @@ impl IStaticBody2D for StonePlace {
         {
             let row = self.base().get_meta("Row");
             let col = self.base().get_meta("Col");
-            godot_print!("Stone is putted to {}:{}", row, col);
+            godot_print!("Stone is putted to {}:{}. Position: {}", row, col, self.base().get_global_position());
         }
     }
 }
