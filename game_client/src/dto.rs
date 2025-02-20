@@ -49,3 +49,15 @@ pub struct GameScore {
     pub black: i32,
     pub white: i32,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserStepRequestDto {
+    pub session: UserSessionDto,
+    pub step: StepDto
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StepDto {
+    pub row: i32,
+    pub col: i32,
+}

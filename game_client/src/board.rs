@@ -61,8 +61,8 @@ impl Board {
         sprite.set_global_scale(Vector2::new(2.0, 2.0));
         sprite.set_texture(&texture);
         let position = Vector2::new(
-            stone_place.get_position().x * 2.0,
             stone_place.get_position().y * 2.0,
+            stone_place.get_position().x * 2.0,
         );
         sprite.set_position(position);
         let mut area = self.base().get_node_as::<Area2D>("Area2D");
