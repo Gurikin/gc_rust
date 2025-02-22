@@ -265,10 +265,10 @@ impl StartGameHud {
         let auth_layer = self.base_mut().get_node_as::<CanvasLayer>("AuthLayer");
         let mut login_input = auth_layer.get_node_as::<LineEdit>("LoginInput");
         let login = login_input.get_text().to_string();
-        // if login.len() < 3 {
-        //     login_input.set_placeholder("Login length must be >= 3");
-        //     return Err(Error::ERR_INVALID_DATA);
-        // }
+        if login.len() < 3 {
+            login_input.set_placeholder("Login length must be >= 3");
+            return Err(Error::ERR_INVALID_DATA);
+        }
         Ok(login)
     }
 
