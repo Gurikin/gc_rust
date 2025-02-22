@@ -15,9 +15,6 @@ pub struct Board {
 
 #[godot_api]
 impl Board {
-    // #[signal]
-    // fn on_put_stone(row: i32, col: i32, color: bool);
-
     #[func]
     fn on_put_stone(&mut self, row: i32, col: i32, color: String) {
         let black = String::from("black");
@@ -59,7 +56,7 @@ impl Board {
         };
         let mut sprite = Sprite2D::new_alloc();
         let texture: Gd<Texture2D> = load(stone_path);
-        sprite.set_global_scale(Vector2::new(2.0, 2.0));
+        sprite.set_global_scale(Vector2::new(1.0, 1.0));
         sprite.set_texture(&texture);
         let position = Vector2::new(
             stone_place.get_position().y * 2.0,
@@ -68,12 +65,18 @@ impl Board {
         sprite.set_position(position);
         let mut area = self.base().get_node_as::<Area2D>("Area2D");
         area.add_child(&sprite);
-        area.remove_child(stone_place);
-        self.stone_place_vec
-            .get_mut(&(row as i32))
-            .unwrap()
-            .remove(&(col as i32));
+        // area.remove_child(stone_place);
+        // self.stone_place_vec
+        //     .get_mut(&(row as i32))
+        //     .unwrap()
+        //     .remove(&(col as i32));
         godot_print!("Added stone. Remove from map");
+        for item in &self.stone_place_vec {
+            let count = item.1.iter().count();
+            if count != 19 {
+                godot_print!("{}: {}", item.0, item.1.iter().count());
+            }
+        }
     }
 }
 
@@ -99,7 +102,7 @@ impl ISprite2D for Board {
                 stone_place_item.set_meta("Row", &Variant::from(row));
                 stone_place_item.set_meta("Col", &Variant::from(col));
                 stone_place_item.set_global_scale(Vector2::new(1.0, 1.0));
-                let position = Vector2::new(row as f32 * 50.0, col as f32 * 50.0);
+                let position = Vector2::new(row as f32 * 25.0, col as f32 * 25.0);
                 stone_place_item.set_global_position(position);
                 godot_print!(
                     "Added child position: {}",

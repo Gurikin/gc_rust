@@ -1,11 +1,11 @@
-use godot::classes::{IStaticBody2D, InputEvent, StaticBody2D};
+use godot::classes::{IMarker2D, InputEvent, Marker2D};
 use godot::prelude::*;
 
 #[derive(GodotClass)]
-#[class(base=StaticBody2D)]
+#[class(base=Marker2D)]
 pub struct StonePlace {
     input: Gd<Input>,
-    base: Base<StaticBody2D>,
+    base: Base<Marker2D>,
 }
 
 #[godot_api]
@@ -16,7 +16,7 @@ impl StonePlace {
 }
 
 #[godot_api]
-impl IStaticBody2D for StonePlace {
+impl IMarker2D for StonePlace {
     fn init(base: Base<Self::Base>) -> Self {
         godot_print!("Make a StonePlace container...");
         Self {
@@ -26,12 +26,12 @@ impl IStaticBody2D for StonePlace {
     }
 
     fn input(&mut self, _: Gd<InputEvent>) {
-        if self.input.is_action_pressed("put_stone")
+        if self.input.is_action_just_pressed("put_stone")
             && self
                 .base()
                 .get_local_mouse_position()
                 .distance_to(self.base().get_position())
-                <= 40.0
+                <= 20.0
         {
             let row = self.base().get_meta("Row");
             let col = self.base().get_meta("Col");

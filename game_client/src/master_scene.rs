@@ -4,7 +4,6 @@ use godot::{
 };
 
 use crate::{
-    board::Board,
     dto::{
         GameScore, GameState, GameStateDto, StepDto, UserSessionDto, UserSessionRequestDto,
         UserSessionStepDto, UserStepRequestDto, UserTokenDto,
@@ -28,6 +27,9 @@ pub struct MasterScene {
 
 #[godot_api]
 impl MasterScene {
+    #[signal]
+    fn put_stone(row: i32, col: i32, color: bool);
+
     #[func]
     fn on_user_step(&mut self, row: i32, col: i32) {
         let step = StepDto { row, col };
@@ -44,19 +46,9 @@ impl MasterScene {
             .header("Content-Type", "application/json")
             .send()
         {
-            Ok(response) => {
-                let game_state = serde_json::from_str::<GameStateDto>(
-                    response.text().unwrap_or("{}".to_string()).trim(),
-                )
-                .unwrap();
-                self.refresh_time(get_format_time(Some("%T")));
-                self.refresh_score(&game_state.game_state.score);
-                self.refresh_board(&game_state.game_state);
-            }
-            Err(e) => {
-                godot_error!("Error: {:?}", e);
-            }
-        }
+            Ok(_) => godot_print!("Step was sent"),
+            Err(e) => godot_error!("Error: {:?}", e),
+        };
     }
 
     pub fn init_game_data(
@@ -133,7 +125,7 @@ impl MasterScene {
     }
 
     fn refresh_board(&mut self, game_state: &GameState) {
-        let mut board = self.base().get_node_as::<Board>("Board");
+        // let mut board = self.base().get_node_as::<Board>("Board");
         for (row_num, row) in game_state.board.iter().enumerate() {
             for (col_num, col) in row.iter().enumerate() {
                 let color = match col {
@@ -146,8 +138,8 @@ impl MasterScene {
                     }
                     None => GString::from("none"),
                 };
-                board.call(
-                    "on_put_stone",
+                self.base_mut().emit_signal(
+                    "put_stone",
                     &[
                         Variant::from(row_num as i32),
                         Variant::from(col_num as i32),
@@ -179,5 +171,8 @@ impl INode2D for MasterScene {
         });
         let mut game_state_timer = self.base().get_node_as::<Timer>("GameStateTimer");
         game_state_timer.start();
+        // let board = self.base().get_node_as::<Board>("Board");
+        // self.base_mut()
+        //     .connect("put_stone", &board.callable("on_put_stone"));
     }
 }
