@@ -6,7 +6,8 @@ use godot::{
 use crate::{
     board::Board,
     dto::{
-        GameScore, GameState, GameStateDto, UserSessionDto, UserSessionRequestDto, UserTokenDto,
+        GameScore, GameState, GameStateDto, StepDto, UserSessionDto, UserSessionRequestDto,
+        UserSessionStepDto, UserStepRequestDto, UserTokenDto,
     },
     util::get_format_time,
 };
@@ -27,6 +28,37 @@ pub struct MasterScene {
 
 #[godot_api]
 impl MasterScene {
+    #[func]
+    fn on_user_step(&mut self, row: i32, col: i32) {
+        let step = StepDto { row, col };
+        let session = UserSessionStepDto {
+            session_id: self.get_session_id().unwrap(),
+            user_id: self.get_user_id(),
+        };
+        let user_step_request = UserStepRequestDto { session, step };
+        let body_str = serde_json::to_string(&user_step_request).unwrap_or("{}".to_string());
+        match self
+            .client
+            .patch(format!("{}/{}", HOST, "game/state"))
+            .body(body_str)
+            .header("Content-Type", "application/json")
+            .send()
+        {
+            Ok(response) => {
+                let game_state = serde_json::from_str::<GameStateDto>(
+                    response.text().unwrap_or("{}".to_string()).trim(),
+                )
+                .unwrap();
+                self.refresh_time(get_format_time(Some("%T")));
+                self.refresh_score(&game_state.game_state.score);
+                self.refresh_board(&game_state.game_state);
+            }
+            Err(e) => {
+                godot_error!("Error: {:?}", e);
+            }
+        }
+    }
+
     pub fn init_game_data(
         &mut self,
         user_session: Option<UserSessionDto>,
@@ -41,11 +73,11 @@ impl MasterScene {
     }
 
     fn get_user_id(&mut self) -> i64 {
-        2 //self.token.clone().map(|t| t.user_id).unwrap_or(-1)
+        self.token.clone().map(|t| t.user_id).unwrap_or(-1) //2
     }
 
     fn get_session_id(&mut self) -> Option<String> {
-        Some(String::from("8e2db1b1-6b1a-48ae-b44b-10fe5f47ffcd")) //self.session.clone().map(|t| t.session_id)
+        self.session.clone().map(|t| t.session_id) //Some(String::from("8e2db1b1-6b1a-48ae-b44b-10fe5f47ffcd"))
     }
 
     #[func]
@@ -101,16 +133,9 @@ impl MasterScene {
     }
 
     fn refresh_board(&mut self, game_state: &GameState) {
-        // let board_scene: Gd<PackedScene> = load("res://content/framework/Board.tscn");
-        // let board = &mut board_scene.instantiate_as::<Board>();
         let mut board = self.base().get_node_as::<Board>("Board");
-        // godot_print!("{:?}", board);
-        // return;
-        // let mut row_num = 0;
-        // let mut col_num = 0;
         for (row_num, row) in game_state.board.iter().enumerate() {
             for (col_num, col) in row.iter().enumerate() {
-                //hud.connect("start_game", &mob.callable("on_start_game"));
                 let color = match col {
                     Some(b) => {
                         if *b {
@@ -129,9 +154,7 @@ impl MasterScene {
                         Variant::from(color),
                     ],
                 );
-                // col_num += 1;
             }
-            // row_num += 1;
         }
     }
 }

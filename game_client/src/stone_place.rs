@@ -9,7 +9,11 @@ pub struct StonePlace {
 }
 
 #[godot_api]
-impl StonePlace {}
+impl StonePlace {
+    /// The signal emit when user click LBM at the free point on a board
+    #[signal]
+    fn user_step(row: i32, col: i32);
+}
 
 #[godot_api]
 impl IStaticBody2D for StonePlace {
@@ -37,6 +41,9 @@ impl IStaticBody2D for StonePlace {
                 col,
                 self.base().get_global_position()
             );
+            // let mut m_scn: Gd<PackedScene> = load("res://content/scenes/Master.tscn");
+            godot_print!("Emit 'user_step' signal");
+            self.base_mut().emit_signal("user_step", &[col, row]);
         }
     }
 }

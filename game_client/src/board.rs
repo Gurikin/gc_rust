@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use godot::classes::{Area2D, ISprite2D, Sprite2D, Texture2D};
 use godot::prelude::*;
 
+use crate::master_scene::MasterScene;
 use crate::stone_place::StonePlace;
 
 #[derive(GodotClass)]
@@ -88,11 +89,12 @@ impl ISprite2D for Board {
 
     fn ready(&mut self) {
         let mut area = self.base().get_node_as::<Area2D>("Area2D");
+        let m_scn = self.base_mut().get_parent().and_then(|p| Option::from(p.cast::<MasterScene>())).expect("Master scene can't be get from board");
         for row in 0..19 {
             let mut col_vec: HashMap<i32, Gd<StonePlace>> = HashMap::new();
             for col in 0..19 {
                 let stone_place_scene: Gd<PackedScene> =
-                    load("res://content/Framework/StonePlace.tscn");
+                    load("res://content/framework/StonePlace.tscn");
                 let mut stone_place_item = stone_place_scene.instantiate_as::<StonePlace>();
                 stone_place_item.set_meta("Row", &Variant::from(row));
                 stone_place_item.set_meta("Col", &Variant::from(col));
@@ -103,6 +105,7 @@ impl ISprite2D for Board {
                     "Added child position: {}",
                     stone_place_item.get_global_position()
                 );
+                stone_place_item.connect("user_step", &m_scn.callable("on_user_step"));
                 area.add_child(&stone_place_item);
                 col_vec.insert(col, stone_place_item);
             }

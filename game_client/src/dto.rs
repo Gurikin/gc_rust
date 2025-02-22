@@ -52,8 +52,14 @@ pub struct GameScore {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserStepRequestDto {
-    pub session: UserSessionDto,
-    pub step: StepDto
+    pub session: UserSessionStepDto,
+    pub step: StepDto,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserSessionStepDto {
+    pub session_id: String,
+    pub user_id: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
