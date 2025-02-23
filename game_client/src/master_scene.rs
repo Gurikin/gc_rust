@@ -52,10 +52,14 @@ impl MasterScene {
                         serde_json::from_str::<UserSessionDto>(response.text().unwrap().trim());
                     self.session.as_mut().unwrap().user2 = us.unwrap().user2;
                     godot_print!("Get User Session by Id sent");
-                    let mut game_state_timer = self.base().get_node_as::<Timer>("GameStateTimer");
-                    game_state_timer.start();
-                    let mut game_start_timer = self.base().get_node_as::<Timer>("GameStartTimer");
-                    game_start_timer.stop();
+                    if self.session.as_mut().unwrap().user2.is_some() {
+                        let mut game_state_timer =
+                            self.base().get_node_as::<Timer>("GameStateTimer");
+                        game_state_timer.start();
+                        let mut game_start_timer =
+                            self.base().get_node_as::<Timer>("GameStartTimer");
+                        game_start_timer.stop();
+                    }
                 }
                 Err(e) => godot_error!("Error: {:?}", e),
             };
