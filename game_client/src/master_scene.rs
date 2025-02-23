@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use godot::{
     classes::{CanvasLayer, Control, Label, Timer},
     prelude::*,
@@ -21,6 +23,7 @@ pub struct MasterScene {
     session: Option<UserSessionDto>,
     token: Option<UserTokenDto>,
     session_request: Option<UserSessionRequestDto>,
+    user_color: Option<bool>,
     client: Client,
     base: Base<Node2D>,
 }
@@ -29,6 +32,35 @@ pub struct MasterScene {
 impl MasterScene {
     #[signal]
     fn put_stone(row: i32, col: i32, color: bool);
+
+    #[func]
+    fn on_game_start(&mut self) {
+        if self.session.is_some() {
+            match self
+                .client
+                .get(format!(
+                    "{}/{}/{}",
+                    HOST,
+                    "session",
+                    self.session.clone().unwrap().session_id
+                ))
+                .header("Content-Type", "application/json")
+                .send()
+            {
+                Ok(response) => {
+                    let us =
+                        serde_json::from_str::<UserSessionDto>(response.text().unwrap().trim());
+                    self.session.as_mut().unwrap().user2 = us.unwrap().user2;
+                    godot_print!("Get User Session by Id sent");
+                    let mut game_state_timer = self.base().get_node_as::<Timer>("GameStateTimer");
+                    game_state_timer.start();
+                    let mut game_start_timer = self.base().get_node_as::<Timer>("GameStartTimer");
+                    game_start_timer.stop();
+                }
+                Err(e) => godot_error!("Error: {:?}", e),
+            };
+        }
+    }
 
     #[func]
     fn on_user_step(&mut self, row: i32, col: i32) {
@@ -72,6 +104,23 @@ impl MasterScene {
         self.session.clone().map(|t| t.session_id) //Some(String::from("8e2db1b1-6b1a-48ae-b44b-10fe5f47ffcd"))
     }
 
+    fn get_nick(&self) -> String {
+        self.token.as_ref().unwrap().login.clone()
+    }
+
+    fn get_opponent_nick(&self) -> String {
+        let session = &self.session;
+        match self.token.clone().unwrap().login == session.clone().unwrap().user1.login {
+            true => session
+                .clone()
+                .unwrap()
+                .user2
+                .map(|us| us.login)
+                .unwrap_or("Wait...".to_string()),
+            false => session.clone().unwrap().user1.login,
+        }
+    }
+
     #[func]
     pub fn on_game_state_tick(&mut self) {
         // godot_print!("Send game state request: Begin");
@@ -88,6 +137,7 @@ impl MasterScene {
                     response.text().unwrap_or("{}".to_string()).trim(),
                 )
                 .unwrap();
+                self.refresh_colors(&game_state.game_state.colors);
                 self.refresh_time(get_format_time(Some("%T")));
                 self.refresh_score(&game_state.game_state.score);
                 self.refresh_board(&game_state.game_state);
@@ -97,6 +147,10 @@ impl MasterScene {
             }
         }
         // godot_print!("{}:\tSend game state request: Ok", get_format_time(None));
+    }
+
+    fn refresh_colors(&mut self, colors: &HashMap<i64, bool>) {
+        self.user_color = Some(*colors.get(&self.get_user_id()).unwrap());
     }
 
     #[func]
@@ -117,11 +171,33 @@ impl MasterScene {
         let mut black_score_label = game_info
             .get_node_as::<Label>("BlackTitleLabel")
             .get_node_as::<Label>("BlackScoreLabel");
-        black_score_label.set_text(&score.black.to_string());
-        let mut black_score_label = game_info
+        let mut white_score_label = game_info
             .get_node_as::<Label>("WhiteTitleLabel")
             .get_node_as::<Label>("WhiteScoreLabel");
-        black_score_label.set_text(&score.white.to_string());
+        let black_score_text = self.get_black_score_label_text(score.black);
+        let white_score_text = self.get_white_score_label_text(score.white);
+        black_score_label.set_text(&black_score_text);
+        white_score_label.set_text(&white_score_text);
+    }
+
+    fn get_black_score_label_text(&mut self, score: i32) -> String {
+        match self.user_color {
+            Some(color) => match color {
+                true => format!("{}: {}", self.get_nick(), score),
+                false => format!("{}: {}", self.get_opponent_nick(), score),
+            },
+            None => format!("{}: {}", "Wait...", score),
+        }
+    }
+
+    fn get_white_score_label_text(&mut self, score: i32) -> String {
+        match self.user_color {
+            Some(color) => match color {
+                false => format!("{}: {}", self.get_nick(), score),
+                true => format!("{}: {}", self.get_opponent_nick(), score),
+            },
+            None => format!("{}: {}", "Wait...", score),
+        }
     }
 
     fn refresh_board(&mut self, game_state: &GameState) {
@@ -159,6 +235,7 @@ impl INode2D for MasterScene {
             session: None,
             token: None,
             session_request: None,
+            user_color: None,
             client,
             base,
         }
@@ -169,8 +246,8 @@ impl INode2D for MasterScene {
             user_id: self.get_user_id(),
             session_id: self.get_session_id(),
         });
-        let mut game_state_timer = self.base().get_node_as::<Timer>("GameStateTimer");
-        game_state_timer.start();
+        let mut game_start_timer = self.base().get_node_as::<Timer>("GameStartTimer");
+        game_start_timer.start();
         // let board = self.base().get_node_as::<Board>("Board");
         // self.base_mut()
         //     .connect("put_stone", &board.callable("on_put_stone"));

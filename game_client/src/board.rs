@@ -92,7 +92,11 @@ impl ISprite2D for Board {
 
     fn ready(&mut self) {
         let mut area = self.base().get_node_as::<Area2D>("Area2D");
-        let m_scn = self.base_mut().get_parent().and_then(|p| Option::from(p.cast::<MasterScene>())).expect("Master scene can't be get from board");
+        let m_scn = self
+            .base_mut()
+            .get_parent()
+            .and_then(|p| Option::from(p.cast::<MasterScene>()))
+            .expect("Master scene can't be get from board");
         for row in 0..19 {
             let mut col_vec: HashMap<i32, Gd<StonePlace>> = HashMap::new();
             for col in 0..19 {
