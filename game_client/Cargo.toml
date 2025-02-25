@@ -1,0 +1,17 @@
+[package]
+name = "gc_rust"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+godot = "0.2.1"
+serde = "1.0.217"
+serde_json = "1"
+log = { version = "0.4", features = ["std"] }
+log4rs = "1"
+reqwest = { version = "0.12.12", features = ["blocking", "json"] }
+go_udp_request = { path = "../go_udp_request" }
+chrono = "0.4.39"
